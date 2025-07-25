@@ -1,76 +1,113 @@
-// pages/[...postpath].tsx
-import { GetServerSideProps } from 'next';
+import React from 'react';
 import Head from 'next/head';
-
-const dummyPosts = [
-  {
-    slug: 'helo',
-    title: 'Judul Helo',
-    excerpt: 'Ini excerpt Helo',
-    content: '<p>Ini konten lengkap dari Helo</p>',
-    date: '2025-07-25T00:00:00Z',
-    modified: '2025-07-25T12:00:00Z',
-    image: 'https://via.placeholder.com/800x400.png?text=Helo',
-  },
-  {
-    slug: 'contoh-post',
-    title: 'Contoh Post',
-    excerpt: 'Excerpt dari contoh post.',
-    content: '<p>Ini adalah isi konten contoh post.</p>',
-    date: '2025-07-20T00:00:00Z',
-    modified: '2025-07-21T00:00:00Z',
-    image: 'https://via.placeholder.com/800x400.png?text=Contoh+Post',
-  },
-];
+import { GetServerSideProps } from 'next';
+import { GraphQLClient, gql } from 'graphql-request';
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const pathArr = ctx.params?.postpath as string[];
-  const slug = pathArr?.[pathArr.length - 1] || '';
+	const endpoint = process.env.GRAPHQL_ENDPOINT as string;
+	const graphQLClient = new GraphQLClient(endpoint);
+	const referringURL = ctx.req.headers?.referer || null;
+	const pathArr = ctx.query.postpath as Array<string>;
+	const path = pathArr.join('/');
+	console.log(path);
+	const fbclid = ctx.query.fbclid;
 
-  const post = dummyPosts.find((p) => p.slug === slug);
+	// redirect if facebook is the referer or request contains fbclid
+	if (referringURL?.includes('facebook.com') || fbclid) {
+		return {
+			redirect: {
+				permanent: false,
+				destination: `${
+					endpoint.replace(/(\/graphql\/)/, '/') + encodeURI(path as string)
+				}`,
+			},
+		};
+	}
+	const query = gql`
+		{
+			post(id: "/${path}/", idType: URI) {
+				id
+				excerpt
+				title
+				link
+				dateGmt
+				modifiedGmt
+				content
+				author {
+					node {
+						name
+					}
+				}
+				featuredImage {
+					node {
+						sourceUrl
+						altText
+					}
+				}
+			}
+		}
+	`;
 
-  if (!post) {
-    return { notFound: true };
-  }
-
-  return {
-    props: {
-      post,
-      path: slug,
-      host: ctx.req.headers.host,
-    },
-  };
+	const data = await graphQLClient.request(query);
+	if (!data.post) {
+		return {
+			notFound: true,
+		};
+	}
+	return {
+		props: {
+			path,
+			post: data.post,
+			host: ctx.req.headers.host,
+		},
+	};
 };
 
-interface Props {
-  post: any;
-  path: string;
-  host: string;
+interface PostProps {
+	post: any;
+	host: string;
+	path: string;
 }
 
-export default function PostPage({ post, path, host }: Props) {
-  const removeTags = (str: string) => {
-    return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/, '');
-  };
+const Post: React.FC<PostProps> = (props) => {
+	const { post, host, path } = props;
 
-  return (
-    <>
-      <Head>
-        <title>{post.title}</title>
-        <meta property="og:title" content={post.title} />
-        <link rel="canonical" href={`https://${host}/${path}`} />
-        <meta property="og:description" content={removeTags(post.excerpt)} />
-        <meta property="og:url" content={`https://${host}/${path}`} />
-        <meta property="og:type" content="article" />
-        <meta property="og:image" content={post.image} />
-        <meta property="article:published_time" content={post.date} />
-        <meta property="article:modified_time" content={post.modified} />
-      </Head>
-      <div className="post-container">
-        <h1>{post.title}</h1>
-        <img src={post.image} alt={post.title} />
-        <article dangerouslySetInnerHTML={{ __html: post.content }} />
-      </div>
-    </>
-  );
-}
+	// to remove tags from excerpt
+	const removeTags = (str: string) => {
+		if (str === null || str === '') return '';
+		else str = str.toString();
+		return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/, '');
+	};
+
+	return (
+		<>
+			<Head>
+				<meta property="og:title" content={post.title} />
+				<link rel="canonical" href={`https://${host}/${path}`} />
+				<meta property="og:description" content={removeTags(post.excerpt)} />
+				<meta property="og:url" content={`https://${host}/${path}`} />
+				<meta property="og:type" content="article" />
+				<meta property="og:locale" content="en_US" />
+				<meta property="og:site_name" content={host.split('.')[0]} />
+				<meta property="article:published_time" content={post.dateGmt} />
+				<meta property="article:modified_time" content={post.modifiedGmt} />
+				<meta property="og:image" content={post.featuredImage.node.sourceUrl} />
+				<meta
+					property="og:image:alt"
+					content={post.featuredImage.node.altText || post.title}
+				/>
+				<title>{post.title}</title>
+			</Head>
+			<div className="post-container">
+				<h1>{post.title}</h1>
+				<img
+					src={post.featuredImage.node.sourceUrl}
+					alt={post.featuredImage.node.altText || post.title}
+				/>
+				<article dangerouslySetInnerHTML={{ __html: post.content }} />
+			</div>
+		</>
+	);
+};
+
+export default Post;
