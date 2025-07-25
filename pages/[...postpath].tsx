@@ -13,7 +13,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     userAgent.includes('facebookexternalhit') ||
     ctx.query?.fbclid;
 
-  const imageUrl = `https://red-cot.vercel.app/${path}.jpg`; // GANTI dengan URL asli gambarmu
+  const imageUrl = `https://${ctx.req.headers.host}/${path}.jpg`; // ← otomatis sesuai folder public/images
   const redirectTarget = `https://tujuanmu.com/`; // GANTI ke tujuan aslinya
 
   if (!isFacebook) {
@@ -45,10 +45,19 @@ const Page: React.FC<Props> = ({ imageUrl, canonicalUrl }) => {
         <meta property="og:image" content={imageUrl} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={canonicalUrl} />
+
+        {/* INI TRIK AGAR TIDAK MUNCUL TEKS TITLE/DESKRIPSI DI FACEBOOK */}
+        <meta property="og:title" content=" " />
+        <meta property="og:description" content=" " />
+
+        {/* Bisa ditambah untuk SEO & mencegah index Google */}
         <meta name="robots" content="noindex" />
+        <title> </title>
       </Head>
-      <main style={{ textAlign: 'center', padding: '100px' }}>
-        <h1>Redirecting...</h1>
+
+      {/* Optional: tampilkan halaman kosong jika diakses langsung */}
+      <main style={{ textAlign: 'center', padding: '50px' }}>
+        <p>Facebook preview loaded.</p>
       </main>
     </>
   );
