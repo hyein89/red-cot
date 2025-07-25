@@ -46,20 +46,22 @@ return {
 		}
 	`;
 
-	const data = await graphQLClient.request(query);
-	if (!data.post) {
-		return {
-			notFound: true,
-		};
-	}
-	return {
-		props: {
-			path,
-			post: data.post,
-			host: ctx.req.headers.host,
-		},
-	};
-};
+try {
+  const data = await graphQLClient.request(query);
+  if (!data?.post) {
+    return { notFound: true };
+  }
+  return {
+    props: {
+      path,
+      post: data.post,
+      host: ctx.req.headers.host,
+    },
+  };
+} catch (error) {
+  console.error("GraphQL ERROR:", error);
+  return { notFound: true };
+}
 
 interface PostProps {
 	post: any;
