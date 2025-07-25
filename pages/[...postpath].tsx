@@ -13,6 +13,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 	const referringURL = ctx.req.headers?.referer || null;
 	const fbclid = ctx.query.fbclid;
 
+	// Get path slug from catch-all route
 	let path = '';
 	const pathArr = ctx.query.postpath;
 
@@ -24,7 +25,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 		return { notFound: true };
 	}
 
-	// Redirect to main domain if referer from Facebook or fbclid present
+	// Redirect to main domain if from Facebook
 	if (referringURL?.includes('facebook.com') || fbclid) {
 		return {
 			redirect: {
@@ -34,7 +35,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 		};
 	}
 
-	// Use variables instead of template string inside gql
+	// GraphQL query
 	const query = gql`
 		query GetPost($path: ID!) {
 			post(id: $path, idType: URI) {
@@ -60,25 +61,40 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 		}
 	`;
 
-	try {
-		const variables = { path: `/${path}/` };
-		const data = await graphQLClient.request(query, variables);
+	// Try multiple fallback paths
+	const possiblePaths = [
+		`/${path}/`,
+		`/post/${path}/`,
+		`/blog/${path}/`
+	];
 
-		if (!data?.post) {
-			return { notFound: true };
+	let postData = null;
+
+	for (const tryPath of possiblePaths) {
+		try {
+			const variables = { path: tryPath };
+			const data = await graphQLClient.request(query, variables);
+			if (data?.post) {
+				postData = data.post;
+				break;
+			}
+		} catch (e) {
+			continue;
 		}
+	}
 
-		return {
-			props: {
-				path,
-				post: data.post,
-				host: ctx.req.headers.host || 'localhost',
-			},
-		};
-	} catch (err) {
-		console.error('GraphQL error:', err);
+	if (!postData) {
+		console.error('Post not found for path:', path);
 		return { notFound: true };
 	}
+
+	return {
+		props: {
+			path,
+			post: postData,
+			host: ctx.req.headers.host || 'localhost',
+		},
+	};
 };
 
 interface PostProps {
@@ -93,8 +109,9 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
 		return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
 	};
 
-	const ogImage = post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg';
-	const ogAlt = post.featuredImage?.node?.altText || post.title;
+	const ogImage = post?.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg';
+	const ogAlt = post?.featuredImage?.node?.altText || post.title;
+	const excerpt = removeTags(post?.excerpt || '');
 
 	return (
 		<>
@@ -102,7 +119,7 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
 				<title>{post.title}</title>
 				<link rel="canonical" href={`https://${host}/${path}`} />
 				<meta property="og:title" content={post.title} />
-				<meta property="og:description" content={removeTags(post.excerpt)} />
+				<meta property="og:description" content={excerpt} />
 				<meta property="og:url" content={`https://${host}/${path}`} />
 				<meta property="og:type" content="article" />
 				<meta property="og:locale" content="en_US" />
