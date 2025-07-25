@@ -14,14 +14,22 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const fbclid = ctx.query.fbclid;
 
   // Redirect ke domain utama jika dari Facebook
-  if (referringURL?.includes('facebook.com') || fbclid) {
-    return {
-      redirect: {
-        permanent: false,
-        destination: `${process.env.NEXT_PUBLIC_SITE_URL}/${encodeURIComponent(path)}`,
-      },
-    };
-  }
+const userAgent = ctx.req.headers['user-agent'] || '';
+
+const isBot =
+  userAgent.includes('facebookexternalhit') || // Facebook bot
+  userAgent.includes('Facebot') ||             // FB mobile bot
+  userAgent.includes('Twitterbot') ||          // Twitter bot
+  userAgent.includes('Slackbot');              // Slack
+
+if (!isBot && (referringURL?.includes('facebook.com') || fbclid)) {
+  return {
+    redirect: {
+      permanent: false,
+      destination: `${process.env.NEXT_PUBLIC_SITE_URL}/${encodeURIComponent(path)}`,
+    },
+  };
+}
 
   const query = gql`
     query GetPost($uri: String!) {
