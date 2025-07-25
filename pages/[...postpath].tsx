@@ -1,85 +1,15 @@
-import React from 'react';
-import Head from 'next/head';
-import { GetServerSideProps } from 'next';
-import { GraphQLClient, gql } from 'graphql-request';
-
-export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const endpoint = process.env.GRAPHQL_ENDPOINT!;
-  const graphQLClient = new GraphQLClient(endpoint);
-  const pathArr = ctx.query.postpath as string[] || [];
-  const path = pathArr.join('/');
-  const fbclid = ctx.query.fbclid;
-  const referer = ctx.req.headers.referer || '';
-  const userAgent = ctx.req.headers['user-agent'] || '';
-
-  const isFacebookBot = /facebookexternalhit|Facebot/i.test(userAgent);
-  const isFbRedirect = fbclid || /facebook\.com/i.test(referer);
-
-  // ✅ Kalau buka dari Facebook dan BUKAN bot → redirect ke WordPress
-  if (!isFacebookBot && isFbRedirect) {
-return {
-  redirect: {
-    permanent: false,
-    destination: `${process.env.NEXT_PUBLIC_SITE_URL}/${encodeURIComponent(path)}`
-  }
-};
-  }
-
-  const query = gql`
-    query GetPost($uri: String!) {
-      post(id: $uri, idType: URI) {
-        id
-        excerpt
-        title
-        link
-        dateGmt
-        modifiedGmt
-        content
-        author {
-          node {
-            name
-          }
-        }
-        featuredImage {
-          node {
-            sourceUrl
-            altText
-          }
-        }
-      }
-    }
-  `;
-
-  try {
-    const data = await graphQLClient.request(query, { uri: `/${path}/` });
-
-    if (!data?.post) return { notFound: true };
-
-    return {
-      props: {
-        path,
-        post: data.post,
-        host: ctx.req.headers.host || process.env.NEXT_PUBLIC_SITE_URL,
-      },
-    };
-  } catch (error) {
-    console.error('GraphQL ERROR:', error);
-    return { notFound: true };
-  }
-};
-
-interface PostProps {
   post: any;
   host: string;
   path: string;
 }
 
 const Post: React.FC<PostProps> = ({ post, host, path }) => {
-  const removeTags = (str: string) =>
-    str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
+  const removeTags = (str: string) => {
+    if (!str) return '';
+    return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
+  };
 
-  const imageUrl =
-    post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg';
+  const imageUrl = post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg';
   const imageAlt = post.featuredImage?.node?.altText || post.title;
 
   return (
@@ -98,10 +28,10 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
         <meta property="og:image" content={imageUrl} />
         <meta property="og:image:alt" content={imageAlt} />
       </Head>
-      <main className="post-container">
+      <div className="post-container">
         <h1>{post.title}</h1>
         <article dangerouslySetInnerHTML={{ __html: post.content }} />
-      </main>
+      </div>
     </>
   );
 };
