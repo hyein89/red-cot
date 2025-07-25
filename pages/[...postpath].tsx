@@ -6,13 +6,12 @@ import { GraphQLClient, gql } from 'graphql-request';
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
 	const endpoint = process.env.GRAPHQL_ENDPOINT as string;
 	const graphQLClient = new GraphQLClient(endpoint);
-
 	const referringURL = ctx.req.headers?.referer || null;
 	const pathArr = ctx.query.postpath as Array<string>;
-	const path = pathArr?.join('/') || '';
+	const path = pathArr.join('/');
 	const fbclid = ctx.query.fbclid;
 
-	// Redirect jika dari Facebook
+	// Redirect ke WordPress jika dari Facebook
 	if (referringURL?.includes('facebook.com') || fbclid) {
 		return {
 			redirect: {
@@ -24,10 +23,9 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 		};
 	}
 
-	// GraphQL query
 	const query = gql`
-		{
-			post(id: "/${path}/", idType: URI) {
+		query GetPost($uri: ID!) {
+			post(id: $uri, idType: URI) {
 				id
 				excerpt
 				title
@@ -50,16 +48,13 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 		}
 	`;
 
-	let data;
-try {
-  data = await graphQLClient.request(query);
-} catch (error) {
-  console.error('❌ Error saat fetch GraphQL:', error);
-  return {
-    notFound: true,
-  };
-}
+	try {
+		const variables = { uri: `/${path}/` };
+		const data = await graphQLClient.request(query, variables);
 
+		if (!data?.post) {
+			return { notFound: true };
+		}
 
 		return {
 			props: {
@@ -69,8 +64,8 @@ try {
 			},
 		};
 	} catch (error) {
-		console.error('GraphQL error:', error);
-		return { notFound: true }; // Penting: hindari error 500
+		console.error('GraphQL Error:', error);
+		return { notFound: true };
 	}
 };
 
@@ -86,6 +81,8 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
 		return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/, '');
 	};
 
+	const image = post.featuredImage?.node?.sourceUrl;
+
 	return (
 		<>
 			<Head>
@@ -98,19 +95,21 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
 				<meta property="og:site_name" content={host.split('.')[0]} />
 				<meta property="article:published_time" content={post.dateGmt} />
 				<meta property="article:modified_time" content={post.modifiedGmt} />
-				<meta property="og:image" content={post.featuredImage.node.sourceUrl} />
-				<meta
-					property="og:image:alt"
-					content={post.featuredImage.node.altText || post.title}
-				/>
+				{image && (
+					<meta property="og:image" content={image} />
+				)}
+				{image && (
+					<meta
+						property="og:image:alt"
+						content={post.featuredImage.node.altText || post.title}
+					/>
+				)}
 				<title>{post.title}</title>
 			</Head>
+
 			<div className="post-container">
 				<h1>{post.title}</h1>
-				<img
-					src={post.featuredImage.node.sourceUrl}
-					alt={post.featuredImage.node.altText || post.title}
-				/>
+				{image && <img src={image} alt={post.featuredImage.node.altText || post.title} />}
 				<article dangerouslySetInnerHTML={{ __html: post.content }} />
 			</div>
 		</>
