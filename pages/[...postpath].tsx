@@ -1,3 +1,4 @@
+// pages/[...postpath].tsx
 import React from 'react';
 import Head from 'next/head';
 import { GetServerSideProps } from 'next';
@@ -6,18 +7,18 @@ import { GraphQLClient, gql } from 'graphql-request';
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const endpoint = process.env.GRAPHQL_ENDPOINT as string;
   const graphQLClient = new GraphQLClient(endpoint);
-
-  const referringURL = ctx.req.headers?.referer || '';
+  const referringURL = ctx.req.headers?.referer || null;
   const fbclid = ctx.query.fbclid;
-  const pathArray = ctx.query.postpath as string[];
-  const path = '/' + pathArray.join('/') + '/'; // pastikan pakai '/' depan & belakang
 
-  // Redirect kalau dari Facebook
-  if (referringURL.includes('facebook.com') || fbclid) {
+  const pathArr = ctx.params?.postpath as string[];
+  const path = pathArr?.join('/') || '';
+
+  // Redirect jika dari Facebook
+  if (referringURL?.includes('facebook.com') || fbclid) {
     return {
       redirect: {
+        destination: `${endpoint.replace(/\/graphql\/?/, '/')}${encodeURI(path)}`,
         permanent: false,
-        destination: endpoint.replace('/graphql', '') + path,
       },
     };
   }
@@ -26,12 +27,12 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     query GetPost($uri: ID!) {
       post(id: $uri, idType: URI) {
         id
-        title
         excerpt
-        content
+        title
+        link
         dateGmt
         modifiedGmt
-        link
+        content
         author {
           node {
             name
@@ -47,11 +48,12 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     }
   `;
 
+  const variables = { uri: `/${path}/` };
+
   try {
-    const variables = { uri: path };
     const data = await graphQLClient.request(query, variables);
 
-    if (!data.post) {
+    if (!data?.post) {
       return { notFound: true };
     }
 
@@ -59,7 +61,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
       props: {
         post: data.post,
         path,
-        host: ctx.req.headers.host || '',
+        host: ctx.req.headers.host,
       },
     };
   } catch (error) {
@@ -70,45 +72,37 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 
 interface PostProps {
   post: any;
-  host: string;
   path: string;
+  host: string;
 }
 
-const Post: React.FC<PostProps> = ({ post, host, path }) => {
-  const removeTags = (str: string) => {
-    if (!str) return '';
-    return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
-  };
+const Post: React.FC<PostProps> = ({ post, path, host }) => {
+  const removeTags = (str: string) =>
+    str?.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/, '') || '';
 
   return (
     <>
       <Head>
+        <title>{post.title}</title>
         <meta property="og:title" content={post.title} />
-        <link rel="canonical" href={`https://${host}${path}`} />
         <meta property="og:description" content={removeTags(post.excerpt)} />
-        <meta property="og:url" content={`https://${host}${path}`} />
+        <meta property="og:url" content={`https://${host}/${path}`} />
+        <meta property="og:image" content={post.featuredImage?.node.sourceUrl || ''} />
+        <meta property="og:image:alt" content={post.featuredImage?.node.altText || post.title} />
         <meta property="og:type" content="article" />
         <meta property="og:locale" content="en_US" />
         <meta property="og:site_name" content={host.split('.')[0]} />
         <meta property="article:published_time" content={post.dateGmt} />
         <meta property="article:modified_time" content={post.modifiedGmt} />
-        <meta property="og:image" content={post.featuredImage?.node.sourceUrl} />
-        <meta
-          property="og:image:alt"
-          content={post.featuredImage?.node.altText || post.title}
-        />
-        <title>{post.title}</title>
+        <link rel="canonical" href={`https://${host}/${path}`} />
       </Head>
-      <main className="post-container">
+      <div>
         <h1>{post.title}</h1>
-        {post.featuredImage?.node.sourceUrl && (
-          <img
-            src={post.featuredImage.node.sourceUrl}
-            alt={post.featuredImage.node.altText || post.title}
-          />
+        {post.featuredImage?.node?.sourceUrl && (
+          <img src={post.featuredImage.node.sourceUrl} alt={post.featuredImage.node.altText} />
         )}
-        <article dangerouslySetInnerHTML={{ __html: post.content }} />
-      </main>
+        <div dangerouslySetInnerHTML={{ __html: post.content }} />
+      </div>
     </>
   );
 };
