@@ -1,3 +1,8 @@
+import React from 'react';
+import Head from 'next/head';
+import { GetServerSideProps } from 'next';
+import { GraphQLClient, gql } from 'graphql-request';
+
 export const getStaticPaths: GetStaticPaths = async () => {
   const res = await fetch('https://bonteng.infy.uk/graphql', {
     method: 'POST',
