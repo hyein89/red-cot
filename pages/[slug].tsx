@@ -12,7 +12,7 @@ export default function PostPage({ post }: any) {
 }
 
 export const getStaticPaths: GetStaticPaths = async () => {
-  const res = await fetch(https://red-cot.vercel.app/graphql', {
+  const res = await fetch('https://bonteng.infy.uk/graphql', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
