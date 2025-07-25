@@ -1,33 +1,42 @@
-// pages/[...postPath].tsx
 import { GetServerSideProps } from 'next';
-import { useRouter } from 'next/router';
+import Head from 'next/head';
 
-const GRAPHQL_ENDPOINT = "https://bonteng.infy.uk/graphql";
+const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT!;
 
 export default function PostPage({ post }: { post: any }) {
-  const router = useRouter();
-
-  if (router.isFallback) return <p>Loading...</p>;
-  if (!post) return <p>404 - Not Found</p>;
+  if (!post) return <p>404 - Post not found</p>;
 
   return (
-    <div>
-      <h1>{post.title}</h1>
-      <div dangerouslySetInnerHTML={{ __html: post.content }} />
-    </div>
+    <>
+      <Head>
+        <title>{post.title}</title>
+        <meta property="og:title" content={post.title} />
+        <meta property="og:image" content={post.featuredImage?.node?.sourceUrl || ''} />
+        <meta property="og:description" content={post.excerpt || ''} />
+      </Head>
+      <div>
+        <h1>{post.title}</h1>
+        <div dangerouslySetInnerHTML={{ __html: post.content }} />
+      </div>
+    </>
   );
 }
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const slugArray = context.params?.postPath as string[];
-  const slug = '/' + slugArray.join('/') + '/'; // ini penting pakai '/' di depan & akhir
+  const slug = '/' + slugArray.join('/') + '/';
 
   const query = `
     query GetPost($id: ID!) {
       post(id: $id, idType: URI) {
         title
         content
-        uri
+        excerpt
+        featuredImage {
+          node {
+            sourceUrl
+          }
+        }
       }
     }
   `;
@@ -38,15 +47,16 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     body: JSON.stringify({ query, variables: { id: slug } }),
   });
 
-  const { data } = await res.json();
+  const result = await res.json();
 
-  if (!data?.post) {
+  if (!result?.data?.post) {
+    console.log('❌ Post not found:', slug);
     return { notFound: true };
   }
 
   return {
     props: {
-      post: data.post,
+      post: result.data.post,
     },
   };
 };
