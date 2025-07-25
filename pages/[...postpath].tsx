@@ -14,12 +14,14 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 
 	// redirect if facebook is the referer or request contains fbclid
 	if (referringURL?.includes('facebook.com') || fbclid) {
-return {
-	redirect: {
-		permanent: false,
-		destination: `https://${ctx.req.headers.host}/${encodeURIComponent(path)}`
-	}
-};
+        return {
+			redirect: {
+				permanent: false,
+				destination: `${
+					endpoint.replace(/(\/graphql\/)/, '/') + encodeURI(path as string)
+				}`,
+			},
+		};
 	}
 	const query = gql`
 		{
