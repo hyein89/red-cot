@@ -6,23 +6,25 @@ import { GraphQLClient, gql } from 'graphql-request';
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
 	const endpoint = process.env.GRAPHQL_ENDPOINT as string;
 	const graphQLClient = new GraphQLClient(endpoint);
+
 	const referringURL = ctx.req.headers?.referer || null;
 	const pathArr = ctx.query.postpath as Array<string>;
-	const path = pathArr.join('/');
-	console.log(path);
+	const path = pathArr?.join('/') || '';
 	const fbclid = ctx.query.fbclid;
 
-	// redirect if facebook is the referer or request contains fbclid
+	// Redirect jika dari Facebook
 	if (referringURL?.includes('facebook.com') || fbclid) {
 		return {
 			redirect: {
 				permanent: false,
 				destination: `${
-					endpoint.replace(/(\/graphql\/)/, '/') + encodeURI(path as string)
+					endpoint.replace(/\/graphql\/?$/, '/') + encodeURI(path)
 				}`,
 			},
 		};
 	}
+
+	// GraphQL query
 	const query = gql`
 		{
 			post(id: "/${path}/", idType: URI) {
@@ -48,19 +50,23 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 		}
 	`;
 
-	const data = await graphQLClient.request(query);
-	if (!data.post) {
+	try {
+		const data = await graphQLClient.request(query);
+		if (!data?.post) {
+			return { notFound: true };
+		}
+
 		return {
-			notFound: true,
+			props: {
+				path,
+				post: data.post,
+				host: ctx.req.headers.host || '',
+			},
 		};
+	} catch (error) {
+		console.error('GraphQL error:', error);
+		return { notFound: true }; // Penting: hindari error 500
 	}
-	return {
-		props: {
-			path,
-			post: data.post,
-			host: ctx.req.headers.host,
-		},
-	};
 };
 
 interface PostProps {
@@ -69,13 +75,9 @@ interface PostProps {
 	path: string;
 }
 
-const Post: React.FC<PostProps> = (props) => {
-	const { post, host, path } = props;
-
-	// to remove tags from excerpt
+const Post: React.FC<PostProps> = ({ post, host, path }) => {
 	const removeTags = (str: string) => {
-		if (str === null || str === '') return '';
-		else str = str.toString();
+		if (!str) return '';
 		return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/, '');
 	};
 
