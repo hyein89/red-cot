@@ -50,11 +50,16 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 		}
 	`;
 
-	try {
-		const data = await graphQLClient.request(query);
-		if (!data?.post) {
-			return { notFound: true };
-		}
+	let data;
+try {
+  data = await graphQLClient.request(query);
+} catch (error) {
+  console.error('❌ Error saat fetch GraphQL:', error);
+  return {
+    notFound: true,
+  };
+}
+
 
 		return {
 			props: {
