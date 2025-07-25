@@ -98,10 +98,10 @@ const Post: React.FC<PostProps> = (props) => {
 			</Head>
 			<div className="post-container">
 				<h1>{post.title}</h1>
-				<img
-					src={post.featuredImage.node.sourceUrl}
-					alt={post.featuredImage.node.altText || post.title}
-				/>
+<meta
+  property="og:image"
+  content={post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg'}
+/>
 				<article dangerouslySetInnerHTML={{ __html: post.content }} />
 			</div>
 		</>
