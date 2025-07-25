@@ -1,29 +1,28 @@
+// pages/[...postpath].tsx
+
 import React from 'react';
 import Head from 'next/head';
 import { GetServerSideProps } from 'next';
 import { GraphQLClient, gql } from 'graphql-request';
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const endpoint = process.env.GRAPHQL_ENDPOINT as string;
+  const endpoint = process.env.GRAPHQL_ENDPOINT!;
   const graphQLClient = new GraphQLClient(endpoint);
-  const referringURL = ctx.req.headers?.referer || null;
-  const pathArr = ctx.query.postpath as Array<string>;
+  const pathArr = ctx.query.postpath as string[] || [];
   const path = pathArr.join('/');
   const fbclid = ctx.query.fbclid;
+  const referer = ctx.req.headers.referer || '';
   const userAgent = ctx.req.headers['user-agent'] || '';
 
-  const isBot =
-    userAgent.includes('facebookexternalhit') ||
-    userAgent.includes('Facebot') ||
-    userAgent.includes('Twitterbot') ||
-    userAgent.includes('Slackbot');
+  const isFacebookBot = /facebookexternalhit|Facebot/i.test(userAgent);
+  const isFbRedirect = fbclid || /facebook\.com/i.test(referer);
 
-  // Redirect hanya kalau bukan bot
-  if (!isBot && (referringURL?.includes('facebook.com') || fbclid)) {
+  // Jika buka dari Facebook dan bukan bot, redirect ke URL WordPress
+  if (!isFacebookBot && isFbRedirect) {
     return {
       redirect: {
         permanent: false,
-        destination: `${process.env.NEXT_PUBLIC_SITE_URL}/${encodeURIComponent(path)}`,
+        destination: `https://bonteng.infy.uk/${path}`,
       },
     };
   }
@@ -54,12 +53,9 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   `;
 
   try {
-    const variables = { uri: `/${path}/` };
-    const data = await graphQLClient.request(query, variables);
+    const data = await graphQLClient.request(query, { uri: `/${path}/` });
 
-    if (!data?.post) {
-      return { notFound: true }; // biar tetap SEO 404
-    }
+    if (!data?.post) return { notFound: true };
 
     return {
       props: {
@@ -81,10 +77,8 @@ interface PostProps {
 }
 
 const Post: React.FC<PostProps> = ({ post, host, path }) => {
-  const removeTags = (str: string) => {
-    if (!str) return '';
-    return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
-  };
+  const removeTags = (str: string) =>
+    str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
 
   const imageUrl = post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg';
   const imageAlt = post.featuredImage?.node?.altText || post.title;
@@ -105,10 +99,10 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
         <meta property="og:image" content={imageUrl} />
         <meta property="og:image:alt" content={imageAlt} />
       </Head>
-      <div className="post-container">
+      <main className="post-container">
         <h1>{post.title}</h1>
         <article dangerouslySetInnerHTML={{ __html: post.content }} />
-      </div>
+      </main>
     </>
   );
 };
