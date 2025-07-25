@@ -1,16 +1,3 @@
-import { GetStaticProps, GetStaticPaths } from 'next';
-
-export default function PostPage({ post }: any) {
-  if (!post) return <p>404 Not Found</p>;
-
-  return (
-    <div style={{ padding: '2rem' }}>
-      <h1>{post.title}</h1>
-      <div dangerouslySetInnerHTML={{ __html: post.content }} />
-    </div>
-  );
-}
-
 export const getStaticPaths: GetStaticPaths = async () => {
   const res = await fetch('https://bonteng.infy.uk/graphql', {
     method: 'POST',
@@ -29,9 +16,11 @@ export const getStaticPaths: GetStaticPaths = async () => {
   });
 
   const json = await res.json();
-  const paths = json.data.posts.nodes.map((post: any) => ({
+  console.log('Paths JSON:', json);
+
+  const paths = json?.data?.posts?.nodes?.map((post: any) => ({
     params: { slug: post.slug },
-  }));
+  })) || [];
 
   return { paths, fallback: 'blocking' };
 };
@@ -54,11 +43,16 @@ export const getStaticProps: GetStaticProps = async ({ params }) => {
   });
 
   const json = await res.json();
+  console.log('Post JSON:', json);
+
+  if (!json?.data?.post) {
+    return { notFound: true };
+  }
+
   return {
     props: {
-      post: json.data.post || null,
+      post: json.data.post,
     },
     revalidate: 10,
   };
 };
-
