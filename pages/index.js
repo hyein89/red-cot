@@ -1,7 +1,7 @@
 export async function getServerSideProps() {
   return {
     redirect: {
-      destination: 'https://example.com/target-article', // GANTI dengan URL tujuan
+      destination: 'https://googel.com', // GANTI dengan URL tujuan
       permanent: false,
     },
   };
