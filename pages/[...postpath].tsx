@@ -4,98 +4,113 @@ import { GetServerSideProps } from 'next';
 import { GraphQLClient, gql } from 'graphql-request';
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-	const endpoint = process.env.GRAPHQL_ENDPOINT as string;
-	const graphQLClient = new GraphQLClient(endpoint);
-	const referer = ctx.req.headers.referer || '';
-	const slug = ctx.params?.slug as string;
-	const fbclid = ctx.query.fbclid;
+  const endpoint = process.env.GRAPHQL_ENDPOINT as string;
+  const graphQLClient = new GraphQLClient(endpoint);
 
-	if (referer.includes('facebook.com') || fbclid) {
-		return {
-			redirect: {
-				permanent: false,
-				destination: `https://bonteng.infy.uk/${slug}`,
-			},
-		};
-	}
+  const referringURL = ctx.req.headers?.referer || '';
+  const fbclid = ctx.query.fbclid;
+  const pathArray = ctx.query.postpath as string[];
+  const path = '/' + pathArray.join('/') + '/'; // pastikan pakai '/' depan & belakang
 
-	const query = gql`
-		query GetPost($slug: ID!) {
-			post(id: $slug, idType: SLUG) {
-				id
-				excerpt
-				title
-				link
-				dateGmt
-				modifiedGmt
-				content
-				author {
-					node {
-						name
-					}
-				}
-				featuredImage {
-					node {
-						sourceUrl
-						altText
-					}
-				}
-			}
-		}
-	`;
+  // Redirect kalau dari Facebook
+  if (referringURL.includes('facebook.com') || fbclid) {
+    return {
+      redirect: {
+        permanent: false,
+        destination: endpoint.replace('/graphql', '') + path,
+      },
+    };
+  }
 
-	try {
-		const data = await graphQLClient.request(query, { slug });
+  const query = gql`
+    query GetPost($uri: ID!) {
+      post(id: $uri, idType: URI) {
+        id
+        title
+        excerpt
+        content
+        dateGmt
+        modifiedGmt
+        link
+        author {
+          node {
+            name
+          }
+        }
+        featuredImage {
+          node {
+            sourceUrl
+            altText
+          }
+        }
+      }
+    }
+  `;
 
-		if (!data.post) {
-			return { notFound: true };
-		}
+  try {
+    const variables = { uri: path };
+    const data = await graphQLClient.request(query, variables);
 
-		return {
-			props: {
-				post: data.post,
-				host: ctx.req.headers.host,
-				slug,
-			},
-		};
-	} catch (error) {
-		console.error('GraphQL Error:', error);
-		return { notFound: true };
-	}
+    if (!data.post) {
+      return { notFound: true };
+    }
+
+    return {
+      props: {
+        post: data.post,
+        path,
+        host: ctx.req.headers.host || '',
+      },
+    };
+  } catch (error) {
+    console.error('GraphQL Error:', error);
+    return { notFound: true };
+  }
 };
 
-interface Props {
-	post: any;
-	host: string;
-	slug: string;
+interface PostProps {
+  post: any;
+  host: string;
+  path: string;
 }
 
-const PostPage: React.FC<Props> = ({ post, host, slug }) => {
-	const removeTags = (str: string) =>
-		str ? str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '') : '';
+const Post: React.FC<PostProps> = ({ post, host, path }) => {
+  const removeTags = (str: string) => {
+    if (!str) return '';
+    return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
+  };
 
-	return (
-		<>
-			<Head>
-				<title>{post.title}</title>
-				<meta property="og:title" content={post.title} />
-				<meta property="og:description" content={removeTags(post.excerpt)} />
-				<meta property="og:url" content={`https://${host}/${slug}`} />
-				<meta property="og:image" content={post.featuredImage?.node?.sourceUrl} />
-				<meta property="og:image:alt" content={post.featuredImage?.node?.altText || post.title} />
-			</Head>
-			<main>
-				<h1>{post.title}</h1>
-				{post.featuredImage?.node?.sourceUrl && (
-					<img
-						src={post.featuredImage.node.sourceUrl}
-						alt={post.featuredImage.node.altText || post.title}
-					/>
-				)}
-				<article dangerouslySetInnerHTML={{ __html: post.content }} />
-			</main>
-		</>
-	);
+  return (
+    <>
+      <Head>
+        <meta property="og:title" content={post.title} />
+        <link rel="canonical" href={`https://${host}${path}`} />
+        <meta property="og:description" content={removeTags(post.excerpt)} />
+        <meta property="og:url" content={`https://${host}${path}`} />
+        <meta property="og:type" content="article" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="og:site_name" content={host.split('.')[0]} />
+        <meta property="article:published_time" content={post.dateGmt} />
+        <meta property="article:modified_time" content={post.modifiedGmt} />
+        <meta property="og:image" content={post.featuredImage?.node.sourceUrl} />
+        <meta
+          property="og:image:alt"
+          content={post.featuredImage?.node.altText || post.title}
+        />
+        <title>{post.title}</title>
+      </Head>
+      <main className="post-container">
+        <h1>{post.title}</h1>
+        {post.featuredImage?.node.sourceUrl && (
+          <img
+            src={post.featuredImage.node.sourceUrl}
+            alt={post.featuredImage.node.altText || post.title}
+          />
+        )}
+        <article dangerouslySetInnerHTML={{ __html: post.content }} />
+      </main>
+    </>
+  );
 };
 
-export default PostPage;
+export default Post;
