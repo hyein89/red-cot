@@ -6,26 +6,22 @@ import { GraphQLClient, gql } from 'graphql-request';
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
 	const endpoint = process.env.GRAPHQL_ENDPOINT as string;
 	const graphQLClient = new GraphQLClient(endpoint);
-	const referringURL = ctx.req.headers?.referer || null;
-	const pathArr = ctx.query.postpath as Array<string>;
-	const path = pathArr.join('/');
+	const referer = ctx.req.headers.referer || '';
+	const slug = ctx.params?.slug as string;
 	const fbclid = ctx.query.fbclid;
 
-	// Redirect ke WordPress jika dari Facebook
-	if (referringURL?.includes('facebook.com') || fbclid) {
+	if (referer.includes('facebook.com') || fbclid) {
 		return {
 			redirect: {
 				permanent: false,
-				destination: `${
-					endpoint.replace(/\/graphql\/?$/, '/') + encodeURI(path)
-				}`,
+				destination: `https://bonteng.infy.uk/${slug}`,
 			},
 		};
 	}
 
 	const query = gql`
-		query GetPost($uri: ID!) {
-			post(id: $uri, idType: URI) {
+		query GetPost($slug: ID!) {
+			post(id: $slug, idType: SLUG) {
 				id
 				excerpt
 				title
@@ -49,18 +45,17 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 	`;
 
 	try {
-		const variables = { uri: `/${path}/` };
-		const data = await graphQLClient.request(query, variables);
+		const data = await graphQLClient.request(query, { slug });
 
-		if (!data?.post) {
+		if (!data.post) {
 			return { notFound: true };
 		}
 
 		return {
 			props: {
-				path,
 				post: data.post,
-				host: ctx.req.headers.host || '',
+				host: ctx.req.headers.host,
+				slug,
 			},
 		};
 	} catch (error) {
@@ -69,51 +64,38 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 	}
 };
 
-interface PostProps {
+interface Props {
 	post: any;
 	host: string;
-	path: string;
+	slug: string;
 }
 
-const Post: React.FC<PostProps> = ({ post, host, path }) => {
-	const removeTags = (str: string) => {
-		if (!str) return '';
-		return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/, '');
-	};
-
-	const image = post.featuredImage?.node?.sourceUrl;
+const PostPage: React.FC<Props> = ({ post, host, slug }) => {
+	const removeTags = (str: string) =>
+		str ? str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '') : '';
 
 	return (
 		<>
 			<Head>
+				<title>{post.title}</title>
 				<meta property="og:title" content={post.title} />
-				<link rel="canonical" href={`https://${host}/${path}`} />
 				<meta property="og:description" content={removeTags(post.excerpt)} />
-				<meta property="og:url" content={`https://${host}/${path}`} />
-				<meta property="og:type" content="article" />
-				<meta property="og:locale" content="en_US" />
-				<meta property="og:site_name" content={host.split('.')[0]} />
-				<meta property="article:published_time" content={post.dateGmt} />
-				<meta property="article:modified_time" content={post.modifiedGmt} />
-				{image && (
-					<meta property="og:image" content={image} />
-				)}
-				{image && (
-					<meta
-						property="og:image:alt"
-						content={post.featuredImage.node.altText || post.title}
+				<meta property="og:url" content={`https://${host}/${slug}`} />
+				<meta property="og:image" content={post.featuredImage?.node?.sourceUrl} />
+				<meta property="og:image:alt" content={post.featuredImage?.node?.altText || post.title} />
+			</Head>
+			<main>
+				<h1>{post.title}</h1>
+				{post.featuredImage?.node?.sourceUrl && (
+					<img
+						src={post.featuredImage.node.sourceUrl}
+						alt={post.featuredImage.node.altText || post.title}
 					/>
 				)}
-				<title>{post.title}</title>
-			</Head>
-
-			<div className="post-container">
-				<h1>{post.title}</h1>
-				{image && <img src={image} alt={post.featuredImage.node.altText || post.title} />}
 				<article dangerouslySetInnerHTML={{ __html: post.content }} />
-			</div>
+			</main>
 		</>
 	);
 };
 
-export default Post;
+export default PostPage;
