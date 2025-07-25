@@ -4,108 +4,106 @@ import { GetServerSideProps } from 'next';
 import { GraphQLClient, gql } from 'graphql-request';
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-	const endpoint = process.env.GRAPHQL_ENDPOINT as string;
-	const graphQLClient = new GraphQLClient(endpoint);
-	const referringURL = ctx.req.headers?.referer || null;
-	const pathArr = ctx.query.postpath as Array<string>;
-	const path = pathArr.join('/');
-	console.log(path);
-	const fbclid = ctx.query.fbclid;
+  const endpoint = process.env.GRAPHQL_ENDPOINT!;
+  const graphQLClient = new GraphQLClient(endpoint);
+  const pathArr = ctx.query.postpath as string[] || [];
+  const path = pathArr.join('/');
+  const fbclid = ctx.query.fbclid;
+  const referer = ctx.req.headers.referer || '';
+  const userAgent = ctx.req.headers['user-agent'] || '';
 
-	// redirect if facebook is the referer or request contains fbclid
-	if (referringURL?.includes('facebook.com') || fbclid) {
+  const isFacebookBot = /facebookexternalhit|Facebot/i.test(userAgent);
+  const isFbRedirect = fbclid || /facebook\.com/i.test(referer);
+
+  // ✅ Kalau buka dari Facebook dan BUKAN bot → redirect ke WordPress
+  if (!isFacebookBot && isFbRedirect) {
 return {
   redirect: {
     permanent: false,
     destination: `${process.env.NEXT_PUBLIC_SITE_URL}/${encodeURIComponent(path)}`
   }
 };
-	}
-	const query = gql`
-		{
-			post(id: "/${path}/", idType: URI) {
-				id
-				excerpt
-				title
-				link
-				dateGmt
-				modifiedGmt
-				content
-				author {
-					node {
-						name
-					}
-				}
-				featuredImage {
-					node {
-						sourceUrl
-						altText
-					}
-				}
-			}
-		}
-	`;
+  }
 
-	const data = await graphQLClient.request(query);
-	if (!data.post) {
-		return {
-			notFound: true,
-		};
-	}
-	return {
-		props: {
-			path,
-			post: data.post,
-			host: ctx.req.headers.host,
-		},
-	};
+  const query = gql`
+    query GetPost($uri: String!) {
+      post(id: $uri, idType: URI) {
+        id
+        excerpt
+        title
+        link
+        dateGmt
+        modifiedGmt
+        content
+        author {
+          node {
+            name
+          }
+        }
+        featuredImage {
+          node {
+            sourceUrl
+            altText
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const data = await graphQLClient.request(query, { uri: `/${path}/` });
+
+    if (!data?.post) return { notFound: true };
+
+    return {
+      props: {
+        path,
+        post: data.post,
+        host: ctx.req.headers.host || process.env.NEXT_PUBLIC_SITE_URL,
+      },
+    };
+  } catch (error) {
+    console.error('GraphQL ERROR:', error);
+    return { notFound: true };
+  }
 };
 
 interface PostProps {
-	post: any;
-	host: string;
-	path: string;
+  post: any;
+  host: string;
+  path: string;
 }
 
-const Post: React.FC<PostProps> = (props) => {
-	const { post, host, path } = props;
+const Post: React.FC<PostProps> = ({ post, host, path }) => {
+  const removeTags = (str: string) =>
+    str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
 
-	// to remove tags from excerpt
-	const removeTags = (str: string) => {
-		if (str === null || str === '') return '';
-		else str = str.toString();
-		return str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/, '');
-	};
+  const imageUrl =
+    post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg';
+  const imageAlt = post.featuredImage?.node?.altText || post.title;
 
-	return (
-		<>
-			<Head>
-				<meta property="og:title" content={post.title} />
-				<link rel="canonical" href={`https://${host}/${path}`} />
-				<meta property="og:description" content={removeTags(post.excerpt)} />
-				<meta property="og:url" content={`https://${host}/${path}`} />
-				<meta property="og:type" content="article" />
-				<meta property="og:locale" content="en_US" />
-				<meta property="og:site_name" content={host.split('.')[0]} />
-				<meta property="article:published_time" content={post.dateGmt} />
-				<meta property="article:modified_time" content={post.modifiedGmt} />
-				<meta property="og:image" content={post.featuredImage.node.sourceUrl} />
-				<meta
-					property="og:image:alt"
-					content={post.featuredImage.node.altText || post.title}
-				/>
-				<title>{post.title}</title>
-			</Head>
-			<div className="post-container">
-				<h1>{post.title}</h1>
-<meta
-  property="og:image"
-  content={post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg'}
-/>
-				<article dangerouslySetInnerHTML={{ __html: post.content }} />
-			</div>
-		</>
-	);
+  return (
+    <>
+      <Head>
+        <title>{post.title}</title>
+        <meta property="og:title" content={post.title} />
+        <meta property="og:description" content={removeTags(post.excerpt)} />
+        <meta property="og:type" content="article" />
+        <meta property="og:locale" content="en_US" />
+        <meta property="og:url" content={`https://${host}/${path}`} />
+        <link rel="canonical" href={`https://${host}/${path}`} />
+        <meta property="og:site_name" content={host.split('.')[0]} />
+        <meta property="article:published_time" content={post.dateGmt} />
+        <meta property="article:modified_time" content={post.modifiedGmt} />
+        <meta property="og:image" content={imageUrl} />
+        <meta property="og:image:alt" content={imageAlt} />
+      </Head>
+      <main className="post-container">
+        <h1>{post.title}</h1>
+        <article dangerouslySetInnerHTML={{ __html: post.content }} />
+      </main>
+    </>
+  );
 };
 
 export default Post;
