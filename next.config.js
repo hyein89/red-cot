@@ -2,7 +2,8 @@
 const nextConfig = {
 	reactStrictMode: true,
 	swcMinify: true,
-	trailingSlash: true, // <- ini penting
+	// trailingSlash: true, // ❌ matikan ini
 };
 
 module.exports = nextConfig;
+
