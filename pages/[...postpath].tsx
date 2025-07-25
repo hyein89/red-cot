@@ -1,5 +1,3 @@
-// pages/[...postpath].tsx
-
 import React from 'react';
 import Head from 'next/head';
 import { GetServerSideProps } from 'next';
@@ -12,24 +10,23 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const pathArr = ctx.query.postpath as Array<string>;
   const path = pathArr.join('/');
   const fbclid = ctx.query.fbclid;
+  const userAgent = ctx.req.headers['user-agent'] || '';
 
-  // Redirect ke domain utama jika dari Facebook
-const userAgent = ctx.req.headers['user-agent'] || '';
+  const isBot =
+    userAgent.includes('facebookexternalhit') ||
+    userAgent.includes('Facebot') ||
+    userAgent.includes('Twitterbot') ||
+    userAgent.includes('Slackbot');
 
-const isBot =
-  userAgent.includes('facebookexternalhit') || // Facebook bot
-  userAgent.includes('Facebot') ||             // FB mobile bot
-  userAgent.includes('Twitterbot') ||          // Twitter bot
-  userAgent.includes('Slackbot');              // Slack
-
-if (!isBot && (referringURL?.includes('facebook.com') || fbclid)) {
-  return {
-    redirect: {
-      permanent: false,
-      destination: `${process.env.NEXT_PUBLIC_SITE_URL}/${encodeURIComponent(path)}`,
-    },
-  };
-}
+  // Redirect hanya kalau bukan bot
+  if (!isBot && (referringURL?.includes('facebook.com') || fbclid)) {
+    return {
+      redirect: {
+        permanent: false,
+        destination: `${process.env.NEXT_PUBLIC_SITE_URL}/${encodeURIComponent(path)}`,
+      },
+    };
+  }
 
   const query = gql`
     query GetPost($uri: String!) {
@@ -61,7 +58,7 @@ if (!isBot && (referringURL?.includes('facebook.com') || fbclid)) {
     const data = await graphQLClient.request(query, variables);
 
     if (!data?.post) {
-      return { notFound: true };
+      return { notFound: true }; // biar tetap SEO 404
     }
 
     return {
