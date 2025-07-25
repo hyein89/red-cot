@@ -24,8 +24,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   }
 
   const query = gql`
-    {
-      post(id: "/${path}/", idType: URI) {
+    query GetPost($uri: String!) {
+      post(id: $uri, idType: URI) {
         id
         excerpt
         title
@@ -49,7 +49,8 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   `;
 
   try {
-    const data = await graphQLClient.request(query);
+    const variables = { uri: `/${path}/` };
+    const data = await graphQLClient.request(query, variables);
 
     if (!data?.post) {
       return { notFound: true };
