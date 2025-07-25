@@ -1,5 +1,3 @@
-// pages/[...postpath].tsx
-
 import React from 'react';
 import Head from 'next/head';
 import { GetServerSideProps } from 'next';
@@ -10,22 +8,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const graphQLClient = new GraphQLClient(endpoint);
   const pathArr = ctx.query.postpath as string[] || [];
   const path = pathArr.join('/');
-  const fbclid = ctx.query.fbclid;
-  const referer = ctx.req.headers.referer || '';
-  const userAgent = ctx.req.headers['user-agent'] || '';
-
-  const isFacebookBot = /facebookexternalhit|Facebot/i.test(userAgent);
-  const isFbRedirect = fbclid || /facebook\.com/i.test(referer);
-
-  // Jika buka dari Facebook dan bukan bot, redirect ke URL WordPress
-  if (!isFacebookBot && isFbRedirect) {
-    return {
-      redirect: {
-        permanent: false,
-        destination: `https://bonteng.infy.uk/${path}`,
-      },
-    };
-  }
 
   const query = gql`
     query GetPost($uri: String!) {
@@ -80,7 +62,8 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
   const removeTags = (str: string) =>
     str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '');
 
-  const imageUrl = post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg';
+  const imageUrl =
+    post.featuredImage?.node?.sourceUrl || 'https://iili.io/Fke33TG.md.jpg';
   const imageAlt = post.featuredImage?.node?.altText || post.title;
 
   return (
@@ -88,7 +71,10 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
       <Head>
         <title>{post.title}</title>
         <meta property="og:title" content={post.title} />
-        <meta property="og:description" content={removeTags(post.excerpt)} />
+        <meta
+          property="og:description"
+          content={removeTags(post.excerpt || '')}
+        />
         <meta property="og:type" content="article" />
         <meta property="og:locale" content="en_US" />
         <meta property="og:url" content={`https://${host}/${path}`} />
@@ -99,7 +85,7 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
         <meta property="og:image" content={imageUrl} />
         <meta property="og:image:alt" content={imageAlt} />
       </Head>
-      <main className="post-container">
+      <main className="post-container" style={{ maxWidth: 720, margin: '0 auto', padding: 16 }}>
         <h1>{post.title}</h1>
         <article dangerouslySetInnerHTML={{ __html: post.content }} />
       </main>
