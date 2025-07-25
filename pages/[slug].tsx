@@ -1,5 +1,4 @@
-// pages/[...postpath].tsx
-
+// pages/[slug].tsx
 import type { GetServerSideProps } from 'next';
 import { gql, GraphQLClient } from 'graphql-request';
 import Head from 'next/head';
@@ -31,18 +30,14 @@ interface Props {
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const postpath = ctx.params?.postpath;
+  const slug = ctx.params?.slug;
 
-  // ⛔ Jika path tidak valid
-  if (!postpath || !Array.isArray(postpath)) {
+  if (!slug || typeof slug !== 'string') {
     return { notFound: true };
   }
 
-  const path = postpath.join('/');
-  const uri = `/${path}/`;
-
-  const endpoint = process.env.WP_GRAPHQL_URL || '';
-  const graphQLClient = new GraphQLClient(endpoint);
+  const uri = `/${slug}/`;
+  const graphQLClient = new GraphQLClient(process.env.WP_GRAPHQL_URL || '');
 
   const query = gql`
     query GetNodeByUri($uri: ID!) {
@@ -79,20 +74,19 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   try {
     const data = await graphQLClient.request<{ nodeByUri: Post | null }>(query, { uri });
 
-    // ⛔ Jika tidak ditemukan
     if (!data.nodeByUri) {
       return { notFound: true };
     }
 
     return {
       props: {
-        path,
         post: data.nodeByUri,
+        path: slug,
         host: ctx.req.headers.host || '',
       },
     };
   } catch (error) {
-    console.error('GraphQL Error:', error);
+    console.error('GraphQL error:', error);
     return { notFound: true };
   }
 };
@@ -115,7 +109,7 @@ export default function Page({ post, path, host }: Props) {
           />
         )}
       </Head>
-      <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem' }}>
+      <main>
         <h1>{post.title}</h1>
         <div dangerouslySetInnerHTML={{ __html: post.content }} />
       </main>
