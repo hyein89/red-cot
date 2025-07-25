@@ -1,80 +1,78 @@
 // pages/[slug].tsx
-import type { GetServerSideProps } from 'next';
-import { gql, GraphQLClient } from 'graphql-request';
-import Head from 'next/head';
+import { GetStaticPaths, GetStaticProps } from 'next'
+import { useRouter } from 'next/router'
 
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-}
+export default function PostPage({ title }: { title: string }) {
+  const router = useRouter()
 
-interface Props {
-  post: Post;
-  host: string;
-  path: string;
-}
+  if (router.isFallback) return <p>Loading...</p>
 
-export const getServerSideProps: GetServerSideProps = async (ctx) => {
-  const slug = ctx.params?.slug;
-  if (!slug || typeof slug !== 'string') {
-    return { notFound: true };
-  }
-
-  const uri = `/${slug}/`;
-  const graphQLClient = new GraphQLClient(process.env.WP_GRAPHQL_URL || 'https://bonteng.infy.uk/graphql');
-
-  const query = gql`
-    query GetNodeByUri($uri: ID!) {
-      nodeByUri(uri: $uri) {
-        __typename
-        ... on Post {
-          id
-          title
-          content
-        }
-        ... on Page {
-          id
-          title
-          content
-        }
-      }
-    }
-  `;
-
-  try {
-    const data = await graphQLClient.request<{ nodeByUri: Post | null }>(query, { uri });
-
-    if (!data.nodeByUri) {
-      return { notFound: true };
-    }
-
-    return {
-      props: {
-        path: slug,
-        post: data.nodeByUri,
-        host: ctx.req.headers.host || '',
-      },
-    };
-  } catch (err) {
-    console.error('GraphQL ERROR:', err);
-    return { notFound: true };
-  }
-};
-
-export default function Page({ post, path, host }: Props) {
   return (
-    <>
-      <Head>
-        <title>{post.title}</title>
-        <meta property="og:title" content={post.title} />
-        <meta property="og:type" content="article" />
-        <meta property="og:url" content={`https://${host}/${path}`} />
-      </Head>
-      <main>
-        <h1>{post.title}</h1>
-        <div dangerouslySetInnerHTML={{ __html: post.content }} />
-      </main>
-    </>
-  );
+    <div>
+      <h1>{title}</h1>
+    </div>
+  )
+}
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  // Fetch all slugs
+  const res = await fetch('https://bonteng.infy.uk/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: `
+        query {
+          posts(first: 100) {
+            nodes {
+              slug
+            }
+          }
+        }
+      `
+    })
+  })
+
+  const json = await res.json()
+  const slugs = json.data.posts.nodes
+
+  const paths = slugs.map((post: any) => ({
+    params: { slug: post.slug }
+  }))
+
+  return { paths, fallback: true }
+}
+
+export const getStaticProps: GetStaticProps = async ({ params }) => {
+  const res = await fetch('https://bonteng.infy.uk/graphql', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: `
+        query GetPostBySlug($slug: String!) {
+          postBy(slug: $slug) {
+            title
+          }
+        }
+      `,
+      variables: {
+        slug: params?.slug
+      }
+    })
+  })
+
+  const json = await res.json()
+  const post = json.data.postBy
+
+  if (!post) {
+    return {
+      notFound: true
+    }
+  }
+
+  return {
+    props: {
+      title: post.title
+    },
+    revalidate: 10
+  }
 }
