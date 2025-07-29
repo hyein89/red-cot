@@ -12,17 +12,32 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const fbclid = ctx.query.fbclid;
   const pathArr = ctx.query.postpath;
 
+  // ✅ Jika root path (/) maka tampilkan kosong
+  if (!pathArr) {
+    return {
+      props: {
+        isRoot: true,
+      },
+    };
+  }
+
   let path = '';
 
   if (Array.isArray(pathArr)) {
     path = pathArr.join('/');
   } else if (typeof pathArr === 'string') {
     path = pathArr;
-  } else {
-    return { notFound: true };
   }
 
-  // Redirect jika dari Facebook
+  if (!path) {
+    return {
+      props: {
+        isRoot: true,
+      },
+    };
+  }
+
+  // ✅ Redirect jika akses dari Facebook
   if (referer.includes('facebook.com') || fbclid) {
     return {
       redirect: {
@@ -74,7 +89,6 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   }
 
   if (!postData) {
-    console.error('Post not found:', path);
     return { notFound: true };
   }
 
@@ -83,17 +97,21 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
       post: postData,
       host: ctx.req.headers.host || 'localhost',
       path,
+      isRoot: false,
     },
   };
 };
 
 interface PostProps {
-  post: any;
+  post?: any;
   host: string;
   path: string;
+  isRoot?: boolean;
 }
 
-const Post: React.FC<PostProps> = ({ post, host, path }) => {
+const Post: React.FC<PostProps> = ({ post, host, path, isRoot }) => {
+  if (isRoot) return null; // ✅ Kosongkan root (/)
+
   const stripTags = (str: string) => {
     return str
       ? str.replace(/(<([^>]+)>)/gi, '').replace(/\[[^\]]*\]/g, '')
@@ -138,4 +156,3 @@ const Post: React.FC<PostProps> = ({ post, host, path }) => {
 };
 
 export default Post;
-
