@@ -45,7 +45,7 @@ export default function RedirectPage({ redirectUrl, imageUrl, title }: Props) {
     <>
 <Head>
   <meta property="og:title" content="&#8206;" />
-  <meta property="og:title" content="&#8206;red-cot.vercel.app" />
+  <meta property="og:url" content="&#8206;red-cot.vercel.app" />
 
   {/* Tidak ada <title> */}
   {/* Tidak ada og:title */}
