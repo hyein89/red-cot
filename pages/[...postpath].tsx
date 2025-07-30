@@ -29,7 +29,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     props: {
       redirectUrl: "https://example.com/offer",
       imageUrl: "https://via.placeholder.com/600x315.png?text=Preview",
-      title: "Judul Postingan",
+      title: null,
     },
   };
 };
