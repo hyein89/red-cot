@@ -43,14 +43,15 @@ export default function RedirectPage({ redirectUrl, imageUrl, title }: Props) {
 
   return (
     <>
-      <Head>
-        {title && <title>{title}</title>}
-        {title && <meta property="og:title" content={title} />}
-        {/* Tetap tampilkan og:image dan og:url jika kamu ingin gambar tetap muncul */}
-        <meta property="og:image" content={imageUrl} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={redirectUrl} />
-      </Head>
+<Head>
+  {/* Tidak ada <title> */}
+  {/* Tidak ada og:title */}
+  {/* Tidak ada og:image */}
+  {/* Tidak ada og:type */}
+  {/* Tidak ada og:url */}
+  <meta name="robots" content="noindex,nofollow" />
+</Head>
+
 
       <main style={{ textAlign: "center", paddingTop: "50px" }}>
         <p>Mengalihkan ke halaman tujuan...</p>
