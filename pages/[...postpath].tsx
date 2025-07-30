@@ -5,7 +5,7 @@ import { useEffect } from "react";
 interface Props {
   redirectUrl: string;
   imageUrl: string;
-  title: string;
+  title: string | null;
 }
 
 export const getServerSideProps: GetServerSideProps = async (ctx) => {
@@ -29,7 +29,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
     props: {
       redirectUrl: "https://example.com/offer",
       imageUrl: "https://via.placeholder.com/600x315.png?text=Preview",
-      title: null,
+      title: null, // sengaja null agar title tidak tampil
     },
   };
 };
@@ -44,11 +44,12 @@ export default function RedirectPage({ redirectUrl, imageUrl, title }: Props) {
   return (
     <>
       <Head>
-        <title>{title}</title>
-        <meta property="og:title" content={title} />
+        {title && <title>{title}</title>}
+        {title && <meta property="og:title" content={title} />}
+        {/* Tetap tampilkan og:image dan og:url jika kamu ingin gambar tetap muncul */}
         <meta property="og:image" content={imageUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content={title} />
+        <meta property="og:url" content={redirectUrl} />
       </Head>
 
       <main style={{ textAlign: "center", paddingTop: "50px" }}>
