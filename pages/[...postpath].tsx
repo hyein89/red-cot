@@ -44,6 +44,8 @@ export default function RedirectPage({ redirectUrl, imageUrl, title }: Props) {
   return (
     <>
 <Head>
+  <meta property="og:title" content="&#8206;" />
+
   {/* Tidak ada <title> */}
   {/* Tidak ada og:title */}
   {/* Tidak ada og:image */}
