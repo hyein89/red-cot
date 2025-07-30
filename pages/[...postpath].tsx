@@ -48,7 +48,7 @@ export default function RedirectPage({ redirectUrl, imageUrl, title }: Props) {
         <meta property="og:title" content={title} />
         <meta property="og:image" content={imageUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content={redirectUrl} />
+        <meta property="og:url" content={title} />
       </Head>
 
       <main style={{ textAlign: "center", paddingTop: "50px" }}>
